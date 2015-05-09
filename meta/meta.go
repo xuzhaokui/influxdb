@@ -1,14 +1,17 @@
 package meta
 
 import (
+	"fmt"
+	"os"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
+	flatbuffers "github.com/google/flatbuffers/go"
 	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/influxdb/meta/internal"
 )
 
-//go:generate protoc --gogo_out=. internal/meta.proto
+//go:generate flatc -g meta.fbs
+//go:generate flatc -g command.fbs
 
 // Data represents the top level collection of all metadata.
 type Data struct {
@@ -55,29 +58,57 @@ func (d *Data) User(name string) *UserInfo {
 	panic("not yet implemented")
 }
 
+// MarshalBinary encodes data to a binary format.
+func (data *Data) MarshalBinary() ([]byte, error) {
+	b := flatbuffers.NewBuilder(0)
+	nodes := data.marshalNodes(b)
+
+	internal.DataStart(b)
+	internal.DataAddNodes(b, nodes)
+	internal.DataAddNodes(b, nodes)
+	b.Finish(internal.DataEnd(b))
+
+	return b.Bytes[b.Head():], nil
+}
+
+func (data *Data) marshalNodes(b *flatbuffers.Builder) flatbuffers.UOffsetT {
+	offsets := make([]flatbuffers.UOffsetT, len(data.Nodes))
+	for i, n := range data.Nodes {
+		internal.NodeInfoStart(b)
+		internal.NodeInfoAddID(b, n.ID)
+		internal.NodeInfoAddHost(b, b.CreateString(n.Host))
+		offsets[i] = internal.NodeInfoEnd(b)
+	}
+
+	internal.DataStartNodesVector(b, len(offsets))
+	for i := len(offsets) - 1; i >= 0; i-- {
+		b.PrependUOffsetT(offsets[i])
+	}
+	return b.EndVector(len(offsets))
+}
+
+// MarshalBinary decodes the object from a binary format.
+func (data *Data) UnmarshalBinary(buf []byte) error {
+	fbs := internal.GetRootAsData(buf, 0)
+
+	// Construct nodes.
+	data.Nodes = make([]NodeInfo, fbs.NodesLength())
+	for i := range data.Nodes {
+		var other internal.NodeInfo
+		fbs.Nodes(&other, i)
+
+		n := &data.Nodes[i]
+		n.ID = other.ID()
+		n.Host = other.Host()
+	}
+
+	return nil
+}
+
 // NodeInfo represents information about a single node in the cluster.
 type NodeInfo struct {
 	ID   uint64
 	Host string
-}
-
-// MarshalBinary encodes the object to a binary format.
-func (info *NodeInfo) MarshalBinary() ([]byte, error) {
-	var pb internal.NodeInfo
-	pb.ID = &info.ID
-	pb.Host = &info.Host
-	return proto.Marshal(&pb)
-}
-
-// MarshalBinary decodes the object from a binary format.
-func (info *NodeInfo) UnmarshalBinary(buf []byte) error {
-	var pb internal.NodeInfo
-	if err := proto.Unmarshal(buf, &pb); err != nil {
-		return err
-	}
-	info.ID = pb.GetID()
-	info.Host = pb.GetHost()
-	return nil
 }
 
 // DatabaseInfo represents information about a database in the system.
@@ -128,3 +159,6 @@ type UserInfo struct {
 	Admin      bool
 	Privileges map[string]influxql.Privilege
 }
+
+func warn(v ...interface{})              { fmt.Fprintln(os.Stderr, v...) }
+func warnf(msg string, v ...interface{}) { fmt.Fprintf(os.Stderr, msg+"\n", v...) }

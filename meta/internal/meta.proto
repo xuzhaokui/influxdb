@@ -2,66 +2,6 @@ package internal;
 
 //========================================================================
 //
-// Metadata
-//
-//========================================================================
-
-message Data {
-	repeated NodeInfo Nodes = 1;
-	repeated DatabaseInfo Databases = 2;
-}
-
-message NodeInfo {
-	required uint64 ID = 1;
-	required string Host = 2;
-}
-
-message DatabaseInfo {
-	required string Name = 1;
-	required string DefaultRetentionPolicy = 2;
-	repeated RetentionPolicyInfo Polices = 3;
-	repeated ContinuousQueryInfo ContinuousQueries = 4;
-}
-
-message RetentionPolicyInfo {
-	required string Name = 1;
-	required int64 Duration = 2;
-	required int64 ShardGroupDuration = 3;
-	required uint32 ReplicaN = 4;
-	repeated ShardGroupInfo ShardGroups = 5;
-}
-
-message ShardGroupInfo {
-	required uint64 ID = 1;
-	required int64 StartTime = 2;
-	required int64 EndTime = 3;
-	repeated ShardInfo Shards = 4;
-}
-
-message ShardInfo {
-	required uint64 ID = 1;
-	required uint64 OwnerIDs = 2;
-}
-
-message ContinuousQueryInfo {
-	required string Query = 1;
-}
-
-message User {
-	required string Name = 1;
-	required string Hash = 2;
-	required bool Admin = 3;
-	repeated UserPrivilege Privileges = 4;
-}
-
-message UserPrivilege {
-	required string Database = 1;
-	required int32 Privilege = 2;
-}
-
-
-//========================================================================
-//
 // COMMANDS
 //
 //========================================================================

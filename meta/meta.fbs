@@ -1,0 +1,57 @@
+namespace internal;
+
+table Data {
+	Nodes:[NodeInfo];
+	Databases:[DatabaseInfo];
+	Users:[UserInfo];
+}
+
+table NodeInfo {
+	ID:ulong;
+	Host:string;
+}
+
+table DatabaseInfo {
+	Name:string;
+	DefaultRetentionPolicy:string;
+	Policies:[RetentionPolicyInfo];
+	ContinuousQueries:[ContinuousQueryInfo];
+}
+
+table RetentionPolicyInfo {
+	Name:string;
+	Duration:long;
+	ShardGroupDuration:long;
+	ReplicaN:uint;
+	ShardGroups:[ShardGroupInfo];
+}
+
+table ShardGroupInfo {
+	ID:ulong;
+	StartTime:long;
+	EndTime:long;
+	Shards:[ShardInfo];
+}
+
+table ShardInfo {
+	ID:ulong;
+	OwnerIDs:ulong;
+}
+
+table ContinuousQueryInfo {
+	Query:string;
+}
+
+table UserInfo {
+	Name:string;
+	Hash:string;
+	Admin:bool;
+	Privileges:[UserPrivilege];
+}
+
+table UserPrivilege {
+	Database:string;
+	Privilege:int;
+}
+
+root_type Data;

@@ -1,5 +1,6 @@
 package meta
 
+/*
 import (
 	"fmt"
 	"io"
@@ -302,3 +303,4 @@ func (s *ServiceFSMSnapshot) Persist(sink raft.SnapshotSink) error {
 
 // Release is invoked when we are finished with the snapshot
 func (s *ServiceFSMSnapshot) Release() {}
+*/
