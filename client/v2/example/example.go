@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
 	"net/url"
 	"os"
 	"time"
@@ -20,6 +21,19 @@ func ExampleNewClient() client.Client {
 		URL:      u,
 		Username: os.Getenv("INFLUX_USER"),
 		Password: os.Getenv("INFLUX_PWD"),
+	})
+	return client
+}
+
+func ExampleNewCustomClient() client.Client {
+	u, _ := url.Parse("http://localhost:8086")
+
+	client := client.NewClient(client.Config{
+		URL: u,
+		// Pass in a *http.Client
+		HTTPClient: &http.Client{
+			Timeout: time.Duration(5) * time.Second,
+		},
 	})
 	return client
 }

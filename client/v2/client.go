@@ -32,6 +32,10 @@ type Config struct {
 	// InsecureSkipVerify gets passed to the http client, if true, it will
 	// skip https certificate verification. Defaults to false
 	InsecureSkipVerify bool
+
+	// HTTPClient is the optional option http client. If not set, Timeout
+	// and InsecureSkipVerify will be used.
+	HTTPClient *http.Client
 }
 
 type BatchPointsConfig struct {
@@ -61,20 +65,23 @@ func NewClient(conf Config) Client {
 	if conf.UserAgent == "" {
 		conf.UserAgent = "InfluxDBClient"
 	}
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: conf.InsecureSkipVerify,
-		},
-	}
-	return &client{
-		url:       conf.URL,
-		username:  conf.Username,
-		password:  conf.Password,
-		useragent: conf.UserAgent,
-		httpClient: &http.Client{
+	if conf.HTTPClient == nil {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: conf.InsecureSkipVerify,
+			},
+		}
+		conf.HTTPClient = &http.Client{
 			Timeout:   conf.Timeout,
 			Transport: tr,
-		},
+		}
+	}
+	return &client{
+		url:        conf.URL,
+		username:   conf.Username,
+		password:   conf.Password,
+		useragent:  conf.UserAgent,
+		httpClient: conf.HTTPClient,
 	}
 }
 
