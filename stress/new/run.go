@@ -150,7 +150,7 @@ type response struct {
 
 func (r response) Success() bool {
 	// ADD success for tcp, udp, etc
-	if r.Resp.StatusCode != 204 {
+	if r.Resp == nil || r.Resp.StatusCode != 204 {
 		return false
 	} else {
 		return true
