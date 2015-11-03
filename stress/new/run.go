@@ -322,7 +322,9 @@ func (s *StressTest) Start() {
 		go func() {
 			rt.StartTimer()
 			for q := range s.QueryGenerate() {
-				s.Query(q)
+				// Not real needs more implementation
+				time.Sleep(100 * time.Millisecond)
+				r <- s.Query(q)
 			}
 			rt.StopTimer()
 			wg.Done()
@@ -334,9 +336,15 @@ func (s *StressTest) Start() {
 		// Needs to have some other stuff abstracted out
 		wg.Add(1)
 		go func() {
+			n := 0
+			s := time.Duration(0)
 			for t := range r {
-				fmt.Println(t)
+				n += 1
+				s += t.Timer.Elapsed()
 			}
+
+			fmt.Printf("Total Queries: %v\n", n)
+			fmt.Printf("Average Query Response Time: %v\n", s/time.Duration(n))
 			wg.Done()
 		}()
 

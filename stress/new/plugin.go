@@ -216,9 +216,18 @@ func (b *BasicQueryClient) Query(cmd Query) response {
 		Command:  string(cmd),
 		Database: b.Database,
 	}
-	_, _ = b.client.Query(q)
 
-	r := response{}
+	t := NewTimer()
+
+	t.StartTimer()
+	_, _ = b.client.Query(q)
+	t.StopTimer()
+
+	// Needs actual response type
+	r := response{
+		Time:  time.Now(),
+		Timer: t,
+	}
 
 	return r
 
