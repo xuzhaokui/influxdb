@@ -242,48 +242,67 @@ type StressTest struct {
 func (s *StressTest) Start() {
 	var wg sync.WaitGroup
 
-	r := make(chan response, 0)
-
+	// Provision the Instance
 	s.Provision()
 
+	wg.Add(1)
 	// Starts Writing
-	wt := NewTimer()
-
-	wg.Add(1)
-	wt.StartTimer()
 	go func() {
-		s.Batch(s.Generate(), r)
-		wt.StopTimer()
-		wg.Done()
-		close(r)
+		r := make(chan response, 0)
+		wt := NewTimer()
+
+		go func() {
+			wt.StartTimer()
+			s.Batch(s.Generate(), r)
+			wt.StopTimer()
+			wg.Done()
+			close(r)
+		}()
+
+		// Write Results Handler
+		// Tempalte of what really will happen
+		// Needs to have some other stuff abstracted out
+		wg.Add(1)
+		go func() {
+			n := 0
+			s := time.Duration(0)
+			for t := range r {
+				s += t.Timer.Elapsed()
+				n += 1
+			}
+			fmt.Printf("Average Response Time: %v\n", s/time.Duration(n))
+			fmt.Printf("Points Per Second: %v\n", float64(n)*float64(10000)/float64(wt.Elapsed().Seconds()))
+			wg.Done()
+		}()
 	}()
 
-	// Tempalte of what really will happen
-	// Needs to have some other stuff abstracted out
 	wg.Add(1)
-	go func() {
-		n := 0
-		s := time.Duration(0)
-		for t := range r {
-			s += t.Timer.Elapsed()
-			n += 1
-		}
-		fmt.Printf("Average Response Time: %v\n", s/time.Duration(n))
-		fmt.Printf("Points Per Second: %v\n", float64(n)*float64(10000)/float64(wt.Elapsed().Seconds()))
-		wg.Done()
-	}()
-
 	// Starts Querying
-	rt := NewTimer()
-
-	wg.Add(1)
-	rt.StartTimer()
 	go func() {
-		for q := range s.QueryGenerate() {
-			s.Query(q)
-		}
-		rt.StopTimer()
-		wg.Done()
+		r := make(chan response, 0)
+		rt := NewTimer()
+
+		go func() {
+			rt.StartTimer()
+			for q := range s.QueryGenerate() {
+				s.Query(q)
+			}
+			rt.StopTimer()
+			wg.Done()
+			close(r)
+		}()
+
+		// Read Results Handler
+		// Tempalte of what really will happen
+		// Needs to have some other stuff abstracted out
+		wg.Add(1)
+		go func() {
+			for t := range r {
+				fmt.Println(t)
+			}
+			wg.Done()
+		}()
+
 	}()
 
 	wg.Wait()

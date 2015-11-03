@@ -26,7 +26,6 @@ type Basic struct {
 	Jitter      bool
 	Measurement string
 	SeriesCount int
-	//TagCount    int
 	//Tags        []tag
 	//Fields      []field
 	StartDate string
