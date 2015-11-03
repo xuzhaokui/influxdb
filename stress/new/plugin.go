@@ -161,6 +161,12 @@ func (c *BasicClient) send(b []byte) response {
 	return r
 }
 
+func (c *BasicClient) Handle(resp <-chan response, fn func(r response)) {
+	for rs := range resp {
+		fn(rs)
+	}
+}
+
 //////////////
 
 type BasicQuery struct {
@@ -275,7 +281,7 @@ func main() {
 		Database:    "stress",
 		Precision:   "n",
 		BatchSize:   10000,
-		Concurrency: 100,
+		Concurrency: 10,
 	}
 
 	w := NewWriter(b, c)

@@ -155,6 +155,13 @@ type QueryResponse struct {
 	Body string
 }
 
+type ResponseHandler interface {
+	Points() int
+	FailedReqests() int
+	Elapsed() time.Duration
+	Handle(func(r <-chan response))
+}
+
 ////////////////////////////////////////
 
 // PointGenerator is an interface for generating points.
@@ -167,6 +174,7 @@ type PointGenerator interface {
 type InfluxClient interface {
 	Batch(ps <-chan Point, r chan<- response)
 	send(b []byte) response
+	//ResponseHandler
 }
 
 // Writer is a PointGenerator and an InfluxClient
@@ -201,6 +209,7 @@ type QueryGenerator interface {
 // to an InfluxDB instance.
 type QueryClient interface {
 	Query(q Query) response
+	//ResponseHandler
 }
 
 // Reader queries the database
@@ -265,11 +274,28 @@ func (s *StressTest) Start() {
 		wg.Add(1)
 		go func() {
 			n := 0
+			success := 0
+			fail := 0
+
 			s := time.Duration(0)
+
 			for t := range r {
-				s += t.Timer.Elapsed()
+
 				n += 1
+
+				if t.Resp.StatusCode != 204 {
+					fail += 1
+				} else {
+					success += 1
+				}
+
+				s += t.Timer.Elapsed()
+
 			}
+
+			fmt.Printf("Total Requests: %v\n", n)
+			fmt.Printf("	Success: %v\n", success)
+			fmt.Printf("	Fail: %v\n", fail)
 			fmt.Printf("Average Response Time: %v\n", s/time.Duration(n))
 			fmt.Printf("Points Per Second: %v\n", float64(n)*float64(10000)/float64(wt.Elapsed().Seconds()))
 			wg.Done()
