@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -135,10 +136,16 @@ func (p *Point) OpenTelnet() []byte {
 /////////////////////////////
 
 // Should be related to ResponseTime in util.go
+//type response struct {
+//	Status   string
+//	Time     time.Time
+//	Duration time.Duration
+//}
+
 type response struct {
-	Status   string
-	Time     time.Time
-	Duration time.Duration
+	Resp  *http.Response
+	Time  time.Time
+	Timer *Timer
 }
 
 type WriteResponse response
@@ -158,7 +165,7 @@ type PointGenerator interface {
 
 // InfluxClient is an interface for writing data to the database
 type InfluxClient interface {
-	Batch(ps <-chan Point)
+	Batch(ps <-chan Point, r chan<- response)
 	send(b []byte) response
 }
 
@@ -234,6 +241,9 @@ type StressTest struct {
 
 func (s *StressTest) Start() {
 	var wg sync.WaitGroup
+
+	r := make(chan response, 0)
+
 	wt := NewTimer()
 	rt := NewTimer()
 
@@ -241,8 +251,23 @@ func (s *StressTest) Start() {
 	wg.Add(1)
 	wt.StartTimer()
 	go func() {
-		s.Batch(s.Generate())
+		s.Batch(s.Generate(), r)
 		wt.StopTimer()
+		wg.Done()
+		close(r)
+	}()
+
+	// Tempalte of what really will happen
+	wg.Add(1)
+	go func() {
+		n := 0
+		s := time.Duration(0)
+		for t := range r {
+			s += t.Timer.Elapsed()
+			n += 1
+		}
+		fmt.Printf("Average Response Time: %v\n", s/time.Duration(n))
+		fmt.Printf("Points Per Second: %v\n", float64(n)*float64(10000)/float64(wt.Elapsed().Seconds()))
 		wg.Done()
 	}()
 

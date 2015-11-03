@@ -10,6 +10,9 @@ import (
 	"net/url"
 	"sync"
 	"time"
+
+	"os"
+	"runtime/pprof"
 	//"github.com/influxdb/strees/provisioner"
 
 	"github.com/influxdb/influxdb/client/v2"
@@ -25,7 +28,8 @@ type Basic struct {
 	//TagCount    int
 	//Tags        []tag
 	//Fields      []field
-	time time.Time
+	StartDate string
+	time      time.Time
 }
 
 func (b *Basic) Generate() <-chan Point {
@@ -34,8 +38,20 @@ func (b *Basic) Generate() <-chan Point {
 	go func(c chan Point) {
 		defer close(c)
 
+		start, err := time.Parse("2006-Jan-02", b.StartDate)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		b.time = start
+
+		tick, err := time.ParseDuration(b.Tick)
+		if err != nil {
+			fmt.Println(err)
+		}
+
 		for i := 0; i < b.PointCount; i++ {
-			b.time = time.Now()
+			b.time = b.time.Add(tick)
 			for j := 0; j < b.SeriesCount; j++ {
 				p := Point{
 					Measurement: b.Measurement,
@@ -60,14 +76,15 @@ type BasicClient struct {
 	Address   string
 	Database  string
 	Precision string
+	//results   chan Timer
 	//SSL       bool
 }
 
-func (c *BasicClient) Batch(ps <-chan Point) {
+func (c *BasicClient) Batch(ps <-chan Point, r chan<- response) {
 	var buf bytes.Buffer
 	var wg sync.WaitGroup
 
-	results := make(chan Timer, 0)
+	//c.results = make(chan Timer, 0)
 
 	counter := NewConcurrencyLimiter(10)
 
@@ -88,15 +105,11 @@ func (c *BasicClient) Batch(ps <-chan Point) {
 			wg.Add(1)
 			counter.Increment()
 			go func(byt []byte) {
-				t := NewTimer()
 
-				t.StartTimer()
-				c.send(byt)
-				t.StopTimer()
+				rs := c.send(byt)
 
 				counter.Decrement()
-
-				results <- t
+				r <- rs
 				wg.Done()
 			}(b)
 
@@ -108,35 +121,42 @@ func (c *BasicClient) Batch(ps <-chan Point) {
 
 	wg.Wait()
 }
-func post(url string, datatype string, data io.Reader) error {
+
+func post(url string, datatype string, data io.Reader) (*http.Response, error) {
 
 	resp, err := http.Post(url, datatype, data)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-		return fmt.Errorf(string(body))
+		return nil, fmt.Errorf(string(body))
 	}
 
-	return nil
+	return resp, nil
 }
 
 func (c *BasicClient) send(b []byte) response {
 	instanceURL := fmt.Sprintf("http://%v/write?db=%v&precision=%v", c.Address, c.Database, c.Precision)
+	t := NewTimer()
 
-	_ = post(instanceURL, "application/x-www-form-urlencoded", bytes.NewBuffer(b))
+	t.StartTimer()
+	resp, err := post(instanceURL, "application/x-www-form-urlencoded", bytes.NewBuffer(b))
+	t.StopTimer()
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	r := response{
-		Status:   "200",
-		Time:     time.Now(),
-		Duration: time.Duration(1),
+		Resp:  resp,
+		Time:  time.Now(),
+		Timer: t,
 	}
 
 	return r
@@ -157,7 +177,7 @@ func (q *BasicQuery) QueryGenerate() <-chan Query {
 
 		for i := 0; i < 1000; i++ {
 			time.Sleep(10 * time.Millisecond)
-			c <- q.Template
+			//c <- q.Template
 		}
 
 	}(c)
@@ -193,20 +213,27 @@ func (b *BasicQueryClient) Query(cmd Query) response {
 	}
 	_, _ = b.client.Query(q)
 
-	r := response{
-		Status:   "Executed",
-		Time:     time.Now(),
-		Duration: time.Duration(1),
-	}
+	r := response{}
+
 	return r
 
 }
 
 func main() {
+	f, err := os.Create("cpuprofile")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	pprof.StartCPUProfile(f)
+	defer pprof.StopCPUProfile()
+
 	b := &Basic{
 		PointCount:  1000,
-		SeriesCount: 1000000,
+		SeriesCount: 100000,
 		Measurement: "cpu",
+		StartDate:   "2006-Jan-02",
+		Tick:        "1s",
 	}
 
 	c := &BasicClient{
@@ -234,14 +261,18 @@ func main() {
 
 	var wg sync.WaitGroup
 
-	wg.Add(2)
+	wg.Add(1)
 	go func() {
 		s.Start()
 		wg.Done()
-	}()
-	go func() {
-		s.Start()
-		wg.Done()
+
+		f, err := os.Create("memprofile")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		pprof.WriteHeapProfile(f)
+		f.Close()
 	}()
 
 	wg.Wait()
