@@ -148,6 +148,15 @@ type response struct {
 	Timer *Timer
 }
 
+func (r response) Success() bool {
+	// ADD success for tcp, udp, etc
+	if r.Resp.StatusCode != 204 {
+		return false
+	} else {
+		return true
+	}
+}
+
 type WriteResponse response
 
 type QueryResponse struct {
@@ -283,15 +292,17 @@ func (s *StressTest) Start() {
 
 				n += 1
 
-				if t.Resp.StatusCode != 204 {
-					fail += 1
-				} else {
+				if t.Success() {
 					success += 1
+				} else {
+					fail += 1
 				}
 
 				s += t.Timer.Elapsed()
 
 			}
+
+			// TODO: ADD RESPONSE HANDLER HERE
 
 			fmt.Printf("Total Requests: %v\n", n)
 			fmt.Printf("	Success: %v\n", success)
