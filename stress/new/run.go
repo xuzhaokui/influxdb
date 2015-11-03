@@ -228,7 +228,7 @@ type Config struct {
 
 // Think out more
 type Provisioner interface {
-	Provision() Config
+	Provision()
 }
 
 /////////////////////////////////////////////
@@ -244,10 +244,11 @@ func (s *StressTest) Start() {
 
 	r := make(chan response, 0)
 
-	wt := NewTimer()
-	rt := NewTimer()
+	s.Provision()
 
 	// Starts Writing
+	wt := NewTimer()
+
 	wg.Add(1)
 	wt.StartTimer()
 	go func() {
@@ -258,6 +259,7 @@ func (s *StressTest) Start() {
 	}()
 
 	// Tempalte of what really will happen
+	// Needs to have some other stuff abstracted out
 	wg.Add(1)
 	go func() {
 		n := 0
@@ -272,6 +274,8 @@ func (s *StressTest) Start() {
 	}()
 
 	// Starts Querying
+	rt := NewTimer()
+
 	wg.Add(1)
 	rt.StartTimer()
 	go func() {
@@ -285,10 +289,11 @@ func (s *StressTest) Start() {
 	wg.Wait()
 }
 
-func NewStressTest(w Writer, r Reader) StressTest {
+func NewStressTest(p Provisioner, w Writer, r Reader) StressTest {
 	s := StressTest{
-		Writer: w,
-		Reader: r,
+		Provisioner: p,
+		Writer:      w,
+		Reader:      r,
 	}
 
 	return s

@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -73,20 +74,19 @@ func (b *Basic) Time() time.Time {
 }
 
 type BasicClient struct {
-	Address   string
-	Database  string
-	Precision string
-	//results   chan Timer
-	//SSL       bool
+	Address     string
+	Database    string
+	Precision   string
+	BatchSize   int
+	Concurrency int
+	SSL         bool
 }
 
 func (c *BasicClient) Batch(ps <-chan Point, r chan<- response) {
 	var buf bytes.Buffer
 	var wg sync.WaitGroup
 
-	//c.results = make(chan Timer, 0)
-
-	counter := NewConcurrencyLimiter(10)
+	counter := NewConcurrencyLimiter(c.Concurrency)
 
 	ctr := 0
 
@@ -97,7 +97,7 @@ func (c *BasicClient) Batch(ps <-chan Point, r chan<- response) {
 		buf.Write(b)
 		buf.Write([]byte("\n"))
 
-		if ctr%10000 == 0 && ctr != 0 {
+		if ctr%c.BatchSize == 0 && ctr != 0 {
 			b := buf.Bytes()
 
 			b = b[0 : len(b)-2]
@@ -219,6 +219,41 @@ func (b *BasicQueryClient) Query(cmd Query) response {
 
 }
 
+///////////////////
+
+func resetDB(c client.Client, database string) error {
+	_, err := c.Query(client.Query{
+		Command: fmt.Sprintf("DROP DATABASE %s", database),
+	})
+
+	if err != nil && !strings.Contains(err.Error(), "database not found") {
+		return err
+	}
+
+	_, err = c.Query(client.Query{
+		Command: fmt.Sprintf("CREATE DATABASE %s", database),
+	})
+
+	return nil
+}
+
+type BasicProvisioner struct {
+	Address       string
+	Database      string
+	ResetDatabase bool
+}
+
+func (b *BasicProvisioner) Provision() {
+	u, _ := url.Parse(fmt.Sprintf("http://%v", b.Address))
+	cl := client.NewClient(client.Config{
+		URL: u,
+	})
+
+	if b.ResetDatabase {
+		resetDB(cl, b.Database)
+	}
+}
+
 func main() {
 	f, err := os.Create("cpuprofile")
 	if err != nil {
@@ -229,7 +264,7 @@ func main() {
 	defer pprof.StopCPUProfile()
 
 	b := &Basic{
-		PointCount:  1000,
+		PointCount:  100,
 		SeriesCount: 100000,
 		Measurement: "cpu",
 		StartDate:   "2006-Jan-02",
@@ -237,9 +272,11 @@ func main() {
 	}
 
 	c := &BasicClient{
-		Address:   "localhost:8086",
-		Database:  "stress",
-		Precision: "n",
+		Address:     "localhost:8086",
+		Database:    "stress",
+		Precision:   "n",
+		BatchSize:   10000,
+		Concurrency: 100,
 	}
 
 	w := NewWriter(b, c)
@@ -257,7 +294,13 @@ func main() {
 
 	r := NewReader(qg, qc)
 
-	s := NewStressTest(w, r)
+	bp := &BasicProvisioner{
+		Address:       "localhost:8086",
+		Database:      "stress",
+		ResetDatabase: true,
+	}
+
+	s := NewStressTest(bp, w, r)
 
 	var wg sync.WaitGroup
 
