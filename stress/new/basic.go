@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"flag"
 	"os"
 	"runtime/pprof"
 
@@ -312,14 +313,24 @@ func BasicReadHandler(r <-chan response, rt *Timer) {
 	fmt.Printf("Average Query Response Time: %v\n", s/time.Duration(n))
 }
 
+var (
+	cpuprofile = flag.String("cpuprofile", "", "File where cpu profile will be written")
+)
+
+func init() {
+	flag.Parse()
+}
+
 func main() {
-	f, err := os.Create("cpuprofile")
-	if err != nil {
-		fmt.Println(err)
-		return
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
 	}
-	pprof.StartCPUProfile(f)
-	defer pprof.StopCPUProfile()
 
 	b := &BasicWriter{
 		PointCount:  100,
