@@ -174,10 +174,6 @@ type QueryResponse struct {
 	Body string
 }
 
-//type ResponseHandler interface {
-//	Handle(r <-chan response)
-//}
-
 ////////////////////////////////////////
 
 // PointGenerator is an interface for generating points.
@@ -224,7 +220,7 @@ type QueryGenerator interface {
 // QueryClient is an interface that can write a query
 // to an InfluxDB instance.
 type QueryClient interface {
-	Query(q Query) response
+	Query(q Query, t time.Time) response
 	//ResponseHandler
 }
 
@@ -306,7 +302,7 @@ func (s *StressTest) Start(wHandle responseHandler, rHandle responseHandler) {
 			for q := range s.QueryGenerate() {
 				// Not real needs more implementation
 				time.Sleep(100 * time.Millisecond)
-				r <- s.Query(q)
+				r <- s.Query(q, s.Time())
 			}
 			rt.StopTimer()
 			wg.Done()

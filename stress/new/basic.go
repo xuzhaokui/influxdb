@@ -14,7 +14,6 @@ import (
 
 	"os"
 	"runtime/pprof"
-	//"github.com/influxdb/strees/provisioner"
 
 	"github.com/influxdb/influxdb/client/v2"
 )
@@ -216,7 +215,7 @@ func (b *BasicQueryClient) Init() {
 	b.client = cl
 }
 
-func (b *BasicQueryClient) Query(cmd Query) response {
+func (b *BasicQueryClient) Query(cmd Query, ts time.Time) response {
 	q := client.Query{
 		Command:  string(cmd),
 		Database: b.Database,
