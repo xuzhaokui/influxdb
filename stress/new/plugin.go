@@ -187,7 +187,7 @@ func (q *BasicQuery) QueryGenerate() <-chan Query {
 
 		for i := 0; i < 1000; i++ {
 			time.Sleep(10 * time.Millisecond)
-			c <- q.Template
+			c <- Query(fmt.Sprintf(string(q.Template), i))
 		}
 
 	}(c)
@@ -301,7 +301,7 @@ func main() {
 	w := NewWriter(b, c)
 
 	qg := &BasicQuery{
-		Template: Query("SELECT * FROM cpu WHERE host='server-1'"),
+		Template: Query("SELECT * FROM cpu WHERE host='server-%v'"),
 	}
 
 	qc := &BasicQueryClient{
