@@ -174,9 +174,9 @@ type QueryResponse struct {
 	Body string
 }
 
-type ResponseHandler interface {
-	Handle(r <-chan response)
-}
+//type ResponseHandler interface {
+//	Handle(r <-chan response)
+//}
 
 ////////////////////////////////////////
 
@@ -268,8 +268,10 @@ type StressTest struct {
 	Reader
 }
 
+type responseHandler func(r <-chan response, t *Timer)
+
 // Start executes the Stress Test
-func (s *StressTest) Start(wHandle func(ws <-chan response, wt *Timer), rHandle func(reads <-chan response, rt *Timer)) {
+func (s *StressTest) Start(wHandle responseHandler, rHandle responseHandler) {
 	var wg sync.WaitGroup
 
 	// Provision the Instance
