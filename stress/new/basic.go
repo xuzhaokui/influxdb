@@ -32,6 +32,7 @@ type BasicWriter struct {
 	//Fields      []field
 	StartDate string
 	time      time.Time
+	mu        sync.Mutex
 }
 
 // Generate returns a receiving Point
@@ -47,7 +48,9 @@ func (b *BasicWriter) Generate() <-chan Point {
 			fmt.Println(err)
 		}
 
+		b.mu.Lock()
 		b.time = start
+		b.mu.Unlock()
 
 		tick, err := time.ParseDuration(b.Tick)
 		if err != nil {
@@ -55,7 +58,9 @@ func (b *BasicWriter) Generate() <-chan Point {
 		}
 
 		for i := 0; i < b.PointCount; i++ {
+			b.mu.Lock()
 			b.time = b.time.Add(tick)
+			b.mu.Unlock()
 			for j := 0; j < b.SeriesCount; j++ {
 				p := Point{
 					Measurement: b.Measurement,
@@ -73,7 +78,10 @@ func (b *BasicWriter) Generate() <-chan Point {
 }
 
 func (b *BasicWriter) Time() time.Time {
-	return b.time
+	b.mu.Lock()
+	t := b.time
+	b.mu.Unlock()
+	return t
 }
 
 type BasicClient struct {
