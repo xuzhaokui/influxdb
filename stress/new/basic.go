@@ -184,7 +184,7 @@ func (q *BasicQuery) QueryGenerate() <-chan Query {
 	go func(chan Query) {
 		defer close(c)
 
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < 250; i++ {
 			time.Sleep(10 * time.Millisecond)
 			c <- Query(fmt.Sprintf(string(q.Template), i))
 		}
