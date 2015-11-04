@@ -360,22 +360,6 @@ func main() {
 
 	s := NewStressTest(bp, w, r)
 
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-	go func() {
-		s.Start(BasicWriteHandler, BasicReadHandler)
-		wg.Done()
-
-		f, err := os.Create("memprofile")
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		pprof.WriteHeapProfile(f)
-		f.Close()
-	}()
-
-	wg.Wait()
+	s.Start(BasicWriteHandler, BasicReadHandler)
 
 }

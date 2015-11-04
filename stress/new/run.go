@@ -95,6 +95,7 @@ func (p *Point) Line() []byte {
 	return byt
 }
 
+// TODO: implement
 // Graphite returns a byte array for a point
 // in graphite-protocol format
 func (p *Point) Graphite() []byte {
@@ -105,6 +106,7 @@ func (p *Point) Graphite() []byte {
 	return []byte(t)
 }
 
+// TODO: implement
 // OpenJSON returns a byte array for a point
 // in JSON format
 func (p *Point) OpenJSON() []byte {
@@ -131,6 +133,7 @@ func (p *Point) OpenJSON() []byte {
 	return []byte("hello")
 }
 
+// TODO: implement
 // OpenTelnet returns a byte array for a point
 // in OpenTSDB-telnet format
 func (p *Point) OpenTelnet() []byte {
