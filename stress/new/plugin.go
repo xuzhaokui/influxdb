@@ -20,6 +20,8 @@ import (
 )
 
 ///////////////////////////////////////////
+
+// Basic implements the PointGenerator interface
 type Basic struct {
 	PointCount  int
 	Tick        string
@@ -32,6 +34,8 @@ type Basic struct {
 	time      time.Time
 }
 
+// Generate returns a receiving Point
+// channel.
 func (b *Basic) Generate() <-chan Point {
 	c := make(chan Point, 0)
 
@@ -81,6 +85,7 @@ type BasicClient struct {
 	SSL         bool
 }
 
+// Abstract out more
 func (c *BasicClient) Batch(ps <-chan Point, r chan<- response) {
 	var buf bytes.Buffer
 	var wg sync.WaitGroup

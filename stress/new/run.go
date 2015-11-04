@@ -95,6 +95,8 @@ func (p *Point) Line() []byte {
 	return byt
 }
 
+// Graphite returns a byte array for a point
+// in graphite-protocol format
 func (p *Point) Graphite() []byte {
 	// timestamp is at second level resolution
 	// but can be specified as a float to get nanosecond
@@ -103,6 +105,8 @@ func (p *Point) Graphite() []byte {
 	return []byte(t)
 }
 
+// OpenJSON returns a byte array for a point
+// in JSON format
 func (p *Point) OpenJSON() []byte {
 	//[
 	//    {
@@ -127,6 +131,8 @@ func (p *Point) OpenJSON() []byte {
 	return []byte("hello")
 }
 
+// OpenTelnet returns a byte array for a point
+// in OpenTSDB-telnet format
 func (p *Point) OpenTelnet() []byte {
 	// timestamp can be 13 digits at most
 	// sys.cpu.nice timestamp value tag_key_1=tag_value_1 tag_key_2=tag_value_2
@@ -142,12 +148,16 @@ func (p *Point) OpenTelnet() []byte {
 //	Duration time.Duration
 //}
 
+// response is the results making
+// a request to influxdb
 type response struct {
 	Resp  *http.Response
 	Time  time.Time
 	Timer *Timer
 }
 
+// Success returns true if the request
+// was successful and false otherwise
 func (r response) Success() bool {
 	// ADD success for tcp, udp, etc
 	if r.Resp == nil || r.Resp.StatusCode != 204 {
@@ -227,6 +237,7 @@ type Reader struct {
 	QueryClient
 }
 
+// NewReader returns a Reader
 func NewReader(q QueryGenerator, c QueryClient) Reader {
 	r := Reader{
 		QueryGenerator: q,
@@ -244,19 +255,23 @@ type Config struct {
 	Address  string
 }
 
-// Think out more
+// Provisioner is an interface that provisions an
+// InfluxDB instance
 type Provisioner interface {
 	Provision()
 }
 
 /////////////////////////////////////////////
 
+// StressTest is a struct that contains all of
+// the logic required to execute a Stress Test
 type StressTest struct {
 	Provisioner
 	Writer
 	Reader
 }
 
+// Start executes the Stress Test
 func (s *StressTest) Start() {
 	var wg sync.WaitGroup
 
@@ -353,6 +368,7 @@ func (s *StressTest) Start() {
 	wg.Wait()
 }
 
+// NewStressTest returns an instance of a StressTest
 func NewStressTest(p Provisioner, w Writer, r Reader) StressTest {
 	s := StressTest{
 		Provisioner: p,
