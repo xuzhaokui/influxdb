@@ -21,8 +21,8 @@ import (
 
 ///////////////////////////////////////////
 
-// Basic implements the PointGenerator interface
-type Basic struct {
+// BasicWriter implements the PointGenerator interface
+type BasicWriter struct {
 	PointCount  int
 	Tick        string
 	Jitter      bool
@@ -36,7 +36,7 @@ type Basic struct {
 
 // Generate returns a receiving Point
 // channel.
-func (b *Basic) Generate() <-chan Point {
+func (b *BasicWriter) Generate() <-chan Point {
 	c := make(chan Point, 0)
 
 	go func(c chan Point) {
@@ -72,7 +72,7 @@ func (b *Basic) Generate() <-chan Point {
 	return c
 }
 
-func (b *Basic) Time() time.Time {
+func (b *BasicWriter) Time() time.Time {
 	return b.time
 }
 
@@ -282,7 +282,7 @@ func main() {
 	pprof.StartCPUProfile(f)
 	defer pprof.StopCPUProfile()
 
-	b := &Basic{
+	b := &BasicWriter{
 		PointCount:  100,
 		SeriesCount: 100000,
 		Measurement: "cpu",
