@@ -273,6 +273,46 @@ func (b *BasicProvisioner) Provision() {
 	}
 }
 
+func BasicWriteHandler(rs <-chan response, wt *Timer) {
+	n := 0
+	success := 0
+	fail := 0
+
+	s := time.Duration(0)
+
+	for t := range rs {
+
+		n += 1
+
+		if t.Success() {
+			success += 1
+		} else {
+			fail += 1
+		}
+
+		s += t.Timer.Elapsed()
+
+	}
+
+	fmt.Printf("Total Requests: %v\n", n)
+	fmt.Printf("	Success: %v\n", success)
+	fmt.Printf("	Fail: %v\n", fail)
+	fmt.Printf("Average Response Time: %v\n", s/time.Duration(n))
+	fmt.Printf("Points Per Second: %v\n", float64(n)*float64(10000)/float64(wt.Elapsed().Seconds()))
+}
+
+func BasicReadHandler(r <-chan response, rt *Timer) {
+	n := 0
+	s := time.Duration(0)
+	for t := range r {
+		n += 1
+		s += t.Timer.Elapsed()
+	}
+
+	fmt.Printf("Total Queries: %v\n", n)
+	fmt.Printf("Average Query Response Time: %v\n", s/time.Duration(n))
+}
+
 func main() {
 	f, err := os.Create("cpuprofile")
 	if err != nil {
@@ -325,7 +365,7 @@ func main() {
 
 	wg.Add(1)
 	go func() {
-		s.Start()
+		s.Start(BasicWriteHandler, BasicReadHandler)
 		wg.Done()
 
 		f, err := os.Create("memprofile")

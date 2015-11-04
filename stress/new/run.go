@@ -175,10 +175,7 @@ type QueryResponse struct {
 }
 
 type ResponseHandler interface {
-	Points() int
-	FailedReqests() int
-	Elapsed() time.Duration
-	Handle(func(r <-chan response))
+	Handle(r <-chan response)
 }
 
 ////////////////////////////////////////
@@ -272,7 +269,7 @@ type StressTest struct {
 }
 
 // Start executes the Stress Test
-func (s *StressTest) Start() {
+func (s *StressTest) Start(wHandle func(ws <-chan response, wt *Timer), rHandle func(reads <-chan response, rt *Timer)) {
 	var wg sync.WaitGroup
 
 	// Provision the Instance
@@ -293,39 +290,7 @@ func (s *StressTest) Start() {
 		}()
 
 		// Write Results Handler
-		// Tempalte of what really will happen
-		// Needs to have some other stuff abstracted out
-		wg.Add(1)
-		go func() {
-			n := 0
-			success := 0
-			fail := 0
-
-			s := time.Duration(0)
-
-			for t := range r {
-
-				n += 1
-
-				if t.Success() {
-					success += 1
-				} else {
-					fail += 1
-				}
-
-				s += t.Timer.Elapsed()
-
-			}
-
-			// TODO: ADD RESPONSE HANDLER HERE
-
-			fmt.Printf("Total Requests: %v\n", n)
-			fmt.Printf("	Success: %v\n", success)
-			fmt.Printf("	Fail: %v\n", fail)
-			fmt.Printf("Average Response Time: %v\n", s/time.Duration(n))
-			fmt.Printf("Points Per Second: %v\n", float64(n)*float64(10000)/float64(wt.Elapsed().Seconds()))
-			wg.Done()
-		}()
+		wHandle(r, wt)
 	}()
 
 	wg.Add(1)
@@ -347,22 +312,7 @@ func (s *StressTest) Start() {
 		}()
 
 		// Read Results Handler
-		// Tempalte of what really will happen
-		// Needs to have some other stuff abstracted out
-		wg.Add(1)
-		go func() {
-			n := 0
-			s := time.Duration(0)
-			for t := range r {
-				n += 1
-				s += t.Timer.Elapsed()
-			}
-
-			fmt.Printf("Total Queries: %v\n", n)
-			fmt.Printf("Average Query Response Time: %v\n", s/time.Duration(n))
-			wg.Done()
-		}()
-
+		rHandle(r, rt)
 	}()
 
 	wg.Wait()
