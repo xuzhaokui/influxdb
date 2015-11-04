@@ -286,12 +286,12 @@ func (s *StressTest) Start(wHandle responseHandler, rHandle responseHandler) {
 			wt.StartTimer()
 			s.Batch(s.Generate(), r)
 			wt.StopTimer()
-			wg.Done()
 			close(r)
 		}()
 
 		// Write Results Handler
 		wHandle(r, wt)
+		wg.Done()
 	}()
 
 	wg.Add(1)
@@ -308,12 +308,12 @@ func (s *StressTest) Start(wHandle responseHandler, rHandle responseHandler) {
 				r <- s.Query(q, s.Time())
 			}
 			rt.StopTimer()
-			wg.Done()
 			close(r)
 		}()
 
 		// Read Results Handler
 		rHandle(r, rt)
+		wg.Done()
 	}()
 
 	wg.Wait()
