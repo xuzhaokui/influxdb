@@ -26,17 +26,16 @@ import (
 //	Timestamp   []byte
 //}
 
-// Tag is a struct for a tag in influxdb
-type Tag struct {
+type KeyValue struct {
 	Key   string
 	Value string
 }
 
+// Tag is a struct for a tag in influxdb
+type Tag KeyValue
+
 // Field is a struct for a field in influxdb
-type Field struct {
-	Key   string
-	Value string
-}
+type Field KeyValue
 
 // Tags is an slice of all the tags for a point
 type Tags []Tag
@@ -44,8 +43,15 @@ type Tags []Tag
 // Fields is an slice of all the fields for a point
 type Fields []Field
 
+type Point interface {
+	Line() []byte
+	//Graphite() []byte
+	//OpenJSON() []byte
+	//OpenTelnet() []byte
+}
+
 // Point represents a point in InfluxDB
-type Point struct {
+type StdPoint struct {
 	Measurement string
 	Tags        Tags
 	Fields      Fields
@@ -80,7 +86,7 @@ func (f Fields) fieldset() []byte {
 
 // Line returns a byte array for a point in
 // line-protocol format
-func (p *Point) Line() []byte {
+func (p StdPoint) Line() []byte {
 	var buf bytes.Buffer
 
 	buf.Write([]byte(fmt.Sprintf("%v,", p.Measurement)))
@@ -98,7 +104,7 @@ func (p *Point) Line() []byte {
 // TODO: implement
 // Graphite returns a byte array for a point
 // in graphite-protocol format
-func (p *Point) Graphite() []byte {
+func (p StdPoint) Graphite() []byte {
 	// timestamp is at second level resolution
 	// but can be specified as a float to get nanosecond
 	// level precision
@@ -109,7 +115,7 @@ func (p *Point) Graphite() []byte {
 // TODO: implement
 // OpenJSON returns a byte array for a point
 // in JSON format
-func (p *Point) OpenJSON() []byte {
+func (p StdPoint) OpenJSON() []byte {
 	//[
 	//    {
 	//        "metric": "sys.cpu.nice",
@@ -136,7 +142,7 @@ func (p *Point) OpenJSON() []byte {
 // TODO: implement
 // OpenTelnet returns a byte array for a point
 // in OpenTSDB-telnet format
-func (p *Point) OpenTelnet() []byte {
+func (p StdPoint) OpenTelnet() []byte {
 	// timestamp can be 13 digits at most
 	// sys.cpu.nice timestamp value tag_key_1=tag_value_1 tag_key_2=tag_value_2
 	return []byte("hello")
