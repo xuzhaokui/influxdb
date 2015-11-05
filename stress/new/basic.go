@@ -41,6 +41,22 @@ func (a AbstractTags) Tag(i int) Tags {
 	return tags
 }
 
+func (t AbstractTags) Tagify() string {
+	var buf bytes.Buffer
+	for i, tag := range t {
+		if i == 0 {
+			buf.Write([]byte(fmt.Sprintf("%v=%v-%%v,", tag.Key, tag.Value)))
+		} else {
+			buf.Write([]byte(fmt.Sprintf("%v=%v,", tag.Key, tag.Value)))
+		}
+	}
+
+	b := buf.Bytes()
+	b = b[0 : len(b)-1]
+
+	return string(b)
+}
+
 // tag is a struct that contains data
 // about a field for in a series
 type AbstractField struct {
@@ -73,6 +89,20 @@ func (a AbstractFields) Field() Fields {
 	return fields
 }
 
+func (f AbstractFields) Fieldify() (string, []string) {
+	var buf bytes.Buffer
+	a := make([]string, len(f))
+	for i, field := range f {
+		buf.Write([]byte(fmt.Sprintf("%v=%%v,", field.Key)))
+		a[i] = field.Type
+	}
+
+	b := buf.Bytes()
+	b = b[0 : len(b)-1]
+
+	return string(b), a
+}
+
 ///////////////////////////////////////////
 
 // BasicWriter implements the PointGenerator interface
@@ -87,36 +117,6 @@ type BasicWriter struct {
 	StartDate   string
 	time        time.Time
 	mu          sync.Mutex
-}
-
-func (t AbstractTags) Tagify() string {
-	var buf bytes.Buffer
-	for i, tag := range t {
-		if i == 0 {
-			buf.Write([]byte(fmt.Sprintf("%v=%v-%%v,", tag.Key, tag.Value)))
-		} else {
-			buf.Write([]byte(fmt.Sprintf("%v=%v,", tag.Key, tag.Value)))
-		}
-	}
-
-	b := buf.Bytes()
-	b = b[0 : len(b)-1]
-
-	return string(b)
-}
-
-func (f AbstractFields) Fieldify() (string, []string) {
-	var buf bytes.Buffer
-	a := make([]string, len(f))
-	for i, field := range f {
-		buf.Write([]byte(fmt.Sprintf("%v=%%v,", field.Key)))
-		a[i] = field.Type
-	}
-
-	b := buf.Bytes()
-	b = b[0 : len(b)-1]
-
-	return string(b), a
 }
 
 func typeArr(a []string) []interface{} {
@@ -159,19 +159,19 @@ func (b *BasicWriter) Template() func(i int, t time.Time) *Pnt {
 }
 
 type Pnt struct {
-	value []byte
+	line []byte
 }
 
 func (p *Pnt) Set(b []byte) {
-	p.value = b
+	p.line = b
 }
 
 func (p *Pnt) Next(i int, t time.Time) {
-	p.value = []byte(fmt.Sprintf("cpu,host=server-%v,location=us-west-%v value=%v %v", i, i, rand.Intn(1000), t.UnixNano()))
+	p.line = []byte(fmt.Sprintf("cpu,host=server-%v,location=us-west-%v value=%v %v", i, i, rand.Intn(1000), t.UnixNano()))
 }
 
 func (p Pnt) Line() []byte {
-	return p.value
+	return p.line
 }
 
 func (b *BasicWriter) Generate() <-chan Point {
@@ -568,6 +568,10 @@ func main() {
 			Key:  "value",
 			Type: "float64",
 		},
+		//AbstractField{
+		//	Key:  "other",
+		//	Type: "bool",
+		//},
 	}
 
 	b := &BasicWriter{
