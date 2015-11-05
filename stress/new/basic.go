@@ -89,9 +89,81 @@ type BasicWriter struct {
 	mu          sync.Mutex
 }
 
+func (t AbstractTags) Tagify() string {
+	var buf bytes.Buffer
+	for i, tag := range t {
+		if i == 0 {
+			buf.Write([]byte(fmt.Sprintf("%v=%v-%%v,", tag.Key, tag.Value)))
+		} else {
+			buf.Write([]byte(fmt.Sprintf("%v=%v,", tag.Key, tag.Value)))
+		}
+	}
+
+	b := buf.Bytes()
+	b = b[0 : len(b)-1]
+
+	return string(b)
+}
+
+func (f AbstractFields) Fieldify() (string, []string) {
+	var buf bytes.Buffer
+	a := make([]string, len(f))
+	for i, field := range f {
+		buf.Write([]byte(fmt.Sprintf("%v=%%v,", field.Key)))
+		a[i] = field.Type
+	}
+
+	b := buf.Bytes()
+	b = b[0 : len(b)-1]
+
+	return string(b), a
+}
+
+func typeArr(a []string) []interface{} {
+	i := make([]interface{}, len(a))
+	for j, ty := range a {
+		var t string
+		switch ty {
+		case "float64":
+			t = fmt.Sprintf("%v", rand.Intn(1000))
+		case "int":
+			t = fmt.Sprintf("%vi", rand.Intn(1000))
+		case "bool":
+			b := rand.Intn(2) == 1
+			t = fmt.Sprintf("%t", b)
+		default:
+			t = fmt.Sprintf("%v", rand.Intn(1000))
+		}
+		i[j] = t
+	}
+
+	return i
+}
+
+func (b *BasicWriter) Template() func(i int, t time.Time) *Pnt {
+	ts := b.Tags.Tagify()
+	fs, fa := b.Fields.Fieldify()
+	tmplt := fmt.Sprintf("%v,%v %v %%v", b.Measurement, ts, fs)
+
+	return func(i int, t time.Time) *Pnt {
+		p := &Pnt{}
+		arr := []interface{}{i}
+		arr = append(arr, typeArr(fa)...)
+		arr = append(arr, t.UnixNano())
+
+		str := fmt.Sprintf(tmplt, arr...)
+		//str := fmt.Sprintf(tmplt, i, rand.Intn(1000), t.UnixNano())
+		p.Set([]byte(str))
+		return p
+	}
+}
+
 type Pnt struct {
-	Template string
-	value    []byte
+	value []byte
+}
+
+func (p *Pnt) Set(b []byte) {
+	p.value = b
 }
 
 func (p *Pnt) Next(i int, t time.Time) {
@@ -104,7 +176,7 @@ func (p Pnt) Line() []byte {
 
 func (b *BasicWriter) Generate() <-chan Point {
 	c := make(chan Point, 0)
-	p := &Pnt{}
+	tmplt := b.Template()
 
 	go func(c chan Point) {
 		defer close(c)
@@ -129,7 +201,7 @@ func (b *BasicWriter) Generate() <-chan Point {
 			b.mu.Unlock()
 
 			for j := 0; j < b.SeriesCount; j++ {
-				p.Next(j, b.time)
+				p := tmplt(j, b.time)
 
 				c <- *p
 			}
