@@ -167,7 +167,9 @@ func (p *Pnt) Set(b []byte) {
 }
 
 func (p *Pnt) Next(i int, t time.Time) {
-	p.line = []byte(fmt.Sprintf("cpu,host=server-%v,location=us-west-%v value=%v %v", i, i, rand.Intn(1000), t.UnixNano()))
+	p.line = []byte(fmt.Sprintf("a,b=c-%v v=%v", i, i))
+	//p.line = []byte(fmt.Sprintf("a,b=c-%v v=%v %v", i, rand.Intn(1000), t.UnixNano()))
+	//p.line = []byte(fmt.Sprintf("cpu,host=server-%v,location=us-west-%v value=%v %v", i, i, rand.Intn(1000), t.UnixNano()))
 }
 
 func (p Pnt) Line() []byte {
@@ -175,8 +177,9 @@ func (p Pnt) Line() []byte {
 }
 
 func (b *BasicWriter) Generate() <-chan Point {
-	c := make(chan Point, 0)
-	tmplt := b.Template()
+	//c := make(chan Point, 0)
+	c := make(chan Point, 15000)
+	//tmplt := b.Template()
 
 	go func(c chan Point) {
 		defer close(c)
@@ -201,7 +204,9 @@ func (b *BasicWriter) Generate() <-chan Point {
 			b.mu.Unlock()
 
 			for j := 0; j < b.SeriesCount; j++ {
-				p := tmplt(j, b.time)
+				//p := tmplt(j, b.time)
+				p := &Pnt{}
+				p.Next(j, b.time)
 
 				c <- *p
 			}
@@ -595,11 +600,12 @@ func main() {
 	//	}
 
 	c := &BasicClient{
-		Address:     "localhost:8086",
+		Address: "localhost:1234",
+		//Address:     "localhost:8086",
 		Database:    "stress",
 		Precision:   "n",
 		BatchSize:   10000,
-		Concurrency: 10,
+		Concurrency: 100,
 	}
 
 	w := NewWriter(b, c)
