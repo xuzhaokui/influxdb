@@ -252,10 +252,10 @@ func NewReader(q QueryGenerator, c QueryClient) Reader {
 /////////////////////////////////////////
 
 // Think out more
-type Config struct {
-	Database string
-	Address  string
-}
+//type Config struct {
+//	Database string
+//	Address  string
+//}
 
 // Provisioner is an interface that provisions an
 // InfluxDB instance

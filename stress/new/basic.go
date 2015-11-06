@@ -16,6 +16,7 @@ import (
 	"os"
 	"runtime/pprof"
 
+	"github.com/BurntSushi/toml"
 	"github.com/influxdb/influxdb/client/v2"
 )
 
@@ -107,14 +108,14 @@ func (f AbstractFields) Fieldify() (string, []string) {
 
 // BasicWriter implements the PointGenerator interface
 type BasicWriter struct {
-	PointCount  int
-	Tick        string
-	Jitter      bool
-	Measurement string
-	SeriesCount int
-	Tags        AbstractTags
-	Fields      AbstractFields
-	StartDate   string
+	PointCount  int            `toml:"point_count"`
+	Tick        string         `toml:"tick"`
+	Jitter      bool           `toml:"jitter"`
+	Measurement string         `toml:"measurement"`
+	SeriesCount int            `toml:"series_count"`
+	Tags        AbstractTags   `toml:"tags"`
+	Fields      AbstractFields `toml:"fields"`
+	StartDate   string         `toml:"start_date"`
 	time        time.Time
 	mu          sync.Mutex
 }
@@ -270,12 +271,12 @@ func (b *BasicWriter) Time() time.Time {
 }
 
 type BasicClient struct {
-	Address     string
-	Database    string
-	Precision   string
-	BatchSize   int
-	Concurrency int
-	SSL         bool
+	Address     string `toml:"address"`
+	Database    string `toml:"database"`
+	Precision   string `toml:"precision"`
+	BatchSize   int    `toml:"batch_size"`
+	Concurrency int    `toml:"concurrency"`
+	SSL         bool   `toml:"ssl"`
 }
 
 // Abstract out more
@@ -368,7 +369,7 @@ func (c *BasicClient) Handle(resp <-chan response, fn func(r response)) {
 //////////////
 
 type BasicQuery struct {
-	Template Query
+	Template Query `toml:"template"`
 	time     time.Time
 }
 
@@ -395,8 +396,8 @@ func (q *BasicQuery) SetTime(t time.Time) {
 }
 
 type BasicQueryClient struct {
-	Address  string
-	Database string
+	Address  string `toml:"address"`
+	Database string `toml:"database"`
 	client   client.Client
 }
 
@@ -450,9 +451,9 @@ func resetDB(c client.Client, database string) error {
 }
 
 type BasicProvisioner struct {
-	Address       string
-	Database      string
-	ResetDatabase bool
+	Address       string `toml:"address"`
+	Database      string `toml:"database"`
+	ResetDatabase bool   `toml:"reset_database"`
 }
 
 func (b *BasicProvisioner) Provision() {
@@ -494,6 +495,24 @@ func BasicWriteHandler(rs <-chan response, wt *Timer) {
 	fmt.Printf("Points Per Second: %v\n", float64(n)*float64(10000)/float64(wt.Elapsed().Seconds()))
 }
 
+///////////////
+
+type Config struct {
+	Provision map[string]interface{} `toml:"provision"`
+	Write     Write                  `toml:"write"`
+	Read      Read                   `toml:"read"`
+}
+
+type Write struct {
+	PointGenerator map[string]interface{} `toml:"point_generator"`
+	InfluxClient   map[string]interface{} `toml:"influx_client"`
+}
+
+type Read struct {
+	QueryGenerator map[string]interface{} `toml:"query_generator"`
+	QueryClient    map[string]interface{} `toml:"query_client"`
+}
+
 func BasicReadHandler(r <-chan response, rt *Timer) {
 	n := 0
 	s := time.Duration(0)
@@ -514,7 +533,29 @@ func init() {
 	flag.Parse()
 }
 
+// DecodeFile takes a file path for a toml config file
+// and returns a pointer to a Config Struct.
+func DecodeFile(s string) (*Config, error) {
+	t := &Config{}
+
+	// Decode the toml file
+	if _, err := toml.DecodeFile(s, t); err != nil {
+		return nil, err
+	}
+
+	return t, nil
+}
+
 func main() {
+	cfg, err := DecodeFile("config.toml")
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Printf("%#v\n\n", cfg)
+
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
 		if err != nil {
@@ -600,12 +641,12 @@ func main() {
 	//	}
 
 	c := &BasicClient{
-		Address: "localhost:1234",
-		//Address:     "localhost:8086",
+		//Address: "localhost:1234",
+		Address:     "localhost:8086",
 		Database:    "stress",
 		Precision:   "n",
 		BatchSize:   10000,
-		Concurrency: 100,
+		Concurrency: 10,
 	}
 
 	w := NewWriter(b, c)
