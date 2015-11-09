@@ -106,15 +106,16 @@ func (f AbstractFields) Fieldify() (string, []string) {
 
 ///////////////////////////////////////////
 
-// BasicWriter implements the PointGenerator interface
-type BasicWriter struct {
+// BasicPointGenerator implements the PointGenerator interface
+type BasicPointGenerator struct {
+	Enabled     bool           `toml:"enabled"`
 	PointCount  int            `toml:"point_count"`
 	Tick        string         `toml:"tick"`
 	Jitter      bool           `toml:"jitter"`
 	Measurement string         `toml:"measurement"`
 	SeriesCount int            `toml:"series_count"`
-	Tags        AbstractTags   `toml:"tags"`
-	Fields      AbstractFields `toml:"fields"`
+	Tags        AbstractTags   `toml:"tag"`
+	Fields      AbstractFields `toml:"field"`
 	StartDate   string         `toml:"start_date"`
 	time        time.Time
 	mu          sync.Mutex
@@ -141,7 +142,7 @@ func typeArr(a []string) []interface{} {
 	return i
 }
 
-func (b *BasicWriter) Template() func(i int, t time.Time) *Pnt {
+func (b *BasicPointGenerator) Template() func(i int, t time.Time) *Pnt {
 	ts := b.Tags.Tagify()
 	fs, fa := b.Fields.Fieldify()
 	tmplt := fmt.Sprintf("%v,%v %v %%v", b.Measurement, ts, fs)
@@ -153,7 +154,6 @@ func (b *BasicWriter) Template() func(i int, t time.Time) *Pnt {
 		arr = append(arr, t.UnixNano())
 
 		str := fmt.Sprintf(tmplt, arr...)
-		//str := fmt.Sprintf(tmplt, i, rand.Intn(1000), t.UnixNano())
 		p.Set([]byte(str))
 		return p
 	}
@@ -177,10 +177,11 @@ func (p Pnt) Line() []byte {
 	return p.line
 }
 
-func (b *BasicWriter) Generate() <-chan Point {
+func (b *BasicPointGenerator) Generate() <-chan Point {
 	//c := make(chan Point, 0)
+	// should be 1.5x batch size
 	c := make(chan Point, 15000)
-	//tmplt := b.Template()
+	tmplt := b.Template()
 
 	go func(c chan Point) {
 		defer close(c)
@@ -205,9 +206,10 @@ func (b *BasicWriter) Generate() <-chan Point {
 			b.mu.Unlock()
 
 			for j := 0; j < b.SeriesCount; j++ {
-				//p := tmplt(j, b.time)
-				p := &Pnt{}
-				p.Next(j, b.time)
+				p := tmplt(j, b.time)
+				// very fast
+				//p := &Pnt{}
+				//p.Next(j, b.time)
 
 				c <- *p
 			}
@@ -219,7 +221,8 @@ func (b *BasicWriter) Generate() <-chan Point {
 
 // Generate returns a receiving Point
 // channel.
-func (b *BasicWriter) Generate2() <-chan Point {
+// USE AS EXAMPLE
+func (b *BasicPointGenerator) Generate2() <-chan Point {
 	c := make(chan Point, 0)
 
 	go func(c chan Point) {
@@ -263,7 +266,7 @@ func (b *BasicWriter) Generate2() <-chan Point {
 	return c
 }
 
-func (b *BasicWriter) Time() time.Time {
+func (b *BasicPointGenerator) Time() time.Time {
 	b.mu.Lock()
 	t := b.time
 	b.mu.Unlock()
@@ -271,6 +274,7 @@ func (b *BasicWriter) Time() time.Time {
 }
 
 type BasicClient struct {
+	Enabled     bool   `toml:"enabled"`
 	Address     string `toml:"address"`
 	Database    string `toml:"database"`
 	Precision   string `toml:"precision"`
@@ -451,6 +455,7 @@ func resetDB(c client.Client, database string) error {
 }
 
 type BasicProvisioner struct {
+	Enabled       bool   `toml:"enabled"`
 	Address       string `toml:"address"`
 	Database      string `toml:"database"`
 	ResetDatabase bool   `toml:"reset_database"`
@@ -498,19 +503,39 @@ func BasicWriteHandler(rs <-chan response, wt *Timer) {
 ///////////////
 
 type Config struct {
-	Provision map[string]interface{} `toml:"provision"`
-	Write     Write                  `toml:"write"`
-	Read      Read                   `toml:"read"`
+	Provision Provision `toml:"provision"`
+	Write     Write     `toml:"write"`
+	Read      Read      `toml:"read"`
+}
+
+type Provision struct {
+	Basic BasicProvisioner `toml:"basic"`
 }
 
 type Write struct {
-	PointGenerator map[string]interface{} `toml:"point_generator"`
-	InfluxClient   map[string]interface{} `toml:"influx_client"`
+	PointGenerators PointGenerators `toml:"point_generator"`
+	InfluxClients   InfluxClients   `toml:"influx_client"`
+}
+
+type PointGenerators struct {
+	Basic BasicPointGenerator `toml:"basic"`
+}
+
+type InfluxClients struct {
+	Basic BasicClient `toml:"basic"`
 }
 
 type Read struct {
-	QueryGenerator map[string]interface{} `toml:"query_generator"`
-	QueryClient    map[string]interface{} `toml:"query_client"`
+	QueryGenerators QueryGenerators `toml:"query_generator"`
+	QueryClients    QueryClients    `toml:"query_client"`
+}
+
+type QueryGenerators struct {
+	Basic BasicQuery `toml:"basic"`
+}
+
+type QueryClients struct {
+	Basic BasicQueryClient `toml:"basic"`
 }
 
 func BasicReadHandler(r <-chan response, rt *Timer) {
@@ -547,14 +572,13 @@ func DecodeFile(s string) (*Config, error) {
 }
 
 func main() {
-	cfg, err := DecodeFile("config.toml")
+
+	cfg, err := DecodeFile("stress.toml")
 
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-
-	fmt.Printf("%#v\n\n", cfg)
 
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -566,136 +590,15 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	t := AbstractTags{
-		AbstractTag{
-			Key:   "host",
-			Value: "server",
-		},
-		//AbstractTag{
-		//	Key:   "location",
-		//	Value: "us",
-		//},
-		//AbstractTag{
-		//	Key:   "t1",
-		//	Value: "t",
-		//},
-		//AbstractTag{
-		//	Key:   "t2",
-		//	Value: "t",
-		//},
-		//AbstractTag{
-		//	Key:   "t3",
-		//	Value: "t",
-		//},
-		//AbstractTag{
-		//	Key:   "host1",
-		//	Value: "server",
-		//},
-		//AbstractTag{
-		//	Key:   "location1",
-		//	Value: "us",
-		//},
-		//AbstractTag{
-		//	Key:   "t11",
-		//	Value: "t",
-		//},
-		//AbstractTag{
-		//	Key:   "t21",
-		//	Value: "t",
-		//},
-		//AbstractTag{
-		//	Key:   "t31",
-		//	Value: "t",
-		//},
-	}
+	w := NewWriter(&cfg.Write.PointGenerators.Basic, &cfg.Write.InfluxClients.Basic)
 
-	f := AbstractFields{
-		AbstractField{
-			Key:  "value",
-			Type: "float64",
-		},
-		//AbstractField{
-		//	Key:  "other",
-		//	Type: "bool",
-		//},
-	}
-
-	b := &BasicWriter{
-		PointCount:  100,
-		SeriesCount: 100000,
-		Measurement: "cpu",
-		Tags:        t,
-		Fields:      f,
-		StartDate:   "2006-Jan-02",
-		Tick:        "1s",
-	}
-
-	//	b2 := &BasicWriter{
-	//		PointCount:  100,
-	//		SeriesCount: 100000,
-	//		Measurement: "mem",
-	//		Tags:        t,
-	//		Fields:      f,
-	//		StartDate:   "2006-Jan-02",
-	//		Tick:        "1s",
-	//	}
-
-	c := &BasicClient{
-		//Address: "localhost:1234",
-		Address:     "localhost:8086",
-		Database:    "stress",
-		Precision:   "n",
-		BatchSize:   10000,
-		Concurrency: 10,
-	}
-
-	w := NewWriter(b, c)
-	//	w2 := NewWriter(b2, c)
-
-	qg := &BasicQuery{
-		Template: Query("SELECT * FROM cpu WHERE host='server-%v'"),
-	}
-
-	qc := &BasicQueryClient{
-		Address:  "localhost:8086",
-		Database: "stress",
-	}
-
+	qc := &cfg.Read.QueryClients.Basic
 	qc.Init()
 
-	r := NewReader(qg, qc)
+	r := NewReader(&cfg.Read.QueryGenerators.Basic, qc)
 
-	bp := &BasicProvisioner{
-		Address:       "localhost:8086",
-		Database:      "stress",
-		ResetDatabase: true,
-	}
-
-	//	bp2 := &BasicProvisioner{
-	//		Address:       "localhost:8086",
-	//		Database:      "stress",
-	//		ResetDatabase: false,
-	//	}
-
-	s := NewStressTest(bp, w, r)
+	s := NewStressTest(&cfg.Provisioner.Basic, w, r)
 
 	s.Start(BasicWriteHandler, BasicReadHandler)
-
-	//	s2 := NewStressTest(bp2, w2, r)
-	//	var wg sync.WaitGroup
-
-	//	wg.Add(1)
-	//	go func() {
-	//		s.Start(BasicWriteHandler, BasicReadHandler)
-	//		wg.Done()
-	//	}()
-	//
-	//	wg.Add(1)
-	//	go func() {
-	//		s2.Start(BasicWriteHandler, BasicReadHandler)
-	//		wg.Done()
-	//	}()
-	//
-	//	wg.Wait()
 
 }
