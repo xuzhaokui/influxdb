@@ -42,6 +42,7 @@
   [read.query_generator]
     [read.query_generator.basic]
       template = "SELECT count(value) FROM cpu where host='server-%v'"
+      query_count = 250
 
   [read.query_client]
     [read.query_client.basic]

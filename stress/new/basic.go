@@ -373,8 +373,9 @@ func (c *BasicClient) Handle(resp <-chan response, fn func(r response)) {
 //////////////
 
 type BasicQuery struct {
-	Template Query `toml:"template"`
-	time     time.Time
+	Template   Query `toml:"template"`
+	QueryCount int   `toml:"query_count"`
+	time       time.Time
 }
 
 func (q *BasicQuery) QueryGenerate() <-chan Query {
@@ -383,7 +384,7 @@ func (q *BasicQuery) QueryGenerate() <-chan Query {
 	go func(chan Query) {
 		defer close(c)
 
-		for i := 0; i < 250; i++ {
+		for i := 0; i < q.QueryCount; i++ {
 			time.Sleep(10 * time.Millisecond)
 			c <- Query(fmt.Sprintf(string(q.Template), i))
 		}
