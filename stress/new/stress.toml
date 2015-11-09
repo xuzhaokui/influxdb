@@ -29,6 +29,7 @@
   [write.influx_client]
     [write.influx_client.basic]
       enabled = true
+      #address = "localhost:1234"
       address = "localhost:8086"
       database = "stress"
       precision = "n"
@@ -40,7 +41,7 @@
 [read]
   [read.query_generator]
     [read.query_generator.basic]
-      tempalte = "SELECT count(value) FROM cpu"
+      template = "SELECT count(value) FROM cpu where host='server-%v'"
 
   [read.query_client]
     [read.query_client.basic]
