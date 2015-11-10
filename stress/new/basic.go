@@ -591,7 +591,6 @@ func main() {
 	w := NewWriter(&cfg.Write.PointGenerators.Basic, &cfg.Write.InfluxClients.Basic)
 
 	qc := &cfg.Read.QueryClients.Basic
-	qc.Init()
 
 	r := NewReader(&cfg.Read.QueryGenerators.Basic, qc)
 
