@@ -131,13 +131,13 @@ case $1 in
     start)
         # Check if config file exist
         if [ ! -r $CONFIG ]; then
-            log_failure_msg "config file doesn't exists"
+            log_failure_msg "config file doesn't exist (or you don't have permission to view)"
             exit 4
         fi
 
         # Checked the PID file exists and check the actual status of process
         if [ -e $PIDFILE ]; then
-	    PID="$(pgrep -F $PIDFILE)"
+	    PID="$(pgrep -f $PIDFILE)"
 	    if test ! -z $PID && kill -0 "$PID" &>/dev/null; then
 		# If the status is SUCCESS then don't need to start again.
                 log_failure_msg "$NAME process is running"
@@ -172,7 +172,7 @@ case $1 in
     stop)
         # Stop the daemon.
         if [ -e $PIDFILE ]; then
-	    PID="$(pgrep -F $PIDFILE)"
+	    PID="$(pgrep -f $PIDFILE)"
 	    if test ! -z $PID && kill -0 "$PID" &>/dev/null; then
                 if killproc -p $PIDFILE SIGTERM && /bin/rm -rf $PIDFILE; then
                     log_success_msg "$NAME process was stopped"
@@ -193,7 +193,7 @@ case $1 in
     status)
         # Check the status of the process.
         if [ -e $PIDFILE ]; then
-	    PID="$(pgrep -F $PIDFILE)"
+	    PID="$(pgrep -f $PIDFILE)"
 	    if test ! -z $PID && test -d "/proc/$PID" &>/dev/null; then
                 log_success_msg "$NAME Process is running"
                 exit 0
