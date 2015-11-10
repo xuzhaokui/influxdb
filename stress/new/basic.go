@@ -274,21 +274,26 @@ func (b *BasicPointGenerator) Time() time.Time {
 }
 
 type BasicClient struct {
-	Enabled     bool   `toml:"enabled"`
-	Address     string `toml:"address"`
-	Database    string `toml:"database"`
-	Precision   string `toml:"precision"`
-	BatchSize   int    `toml:"batch_size"`
-	Concurrency int    `toml:"concurrency"`
-	SSL         bool   `toml:"ssl"`
+	Enabled       bool   `toml:"enabled"`
+	Address       string `toml:"address"`
+	Database      string `toml:"database"`
+	Precision     string `toml:"precision"`
+	BatchSize     int    `toml:"batch_size"`
+	BatchInterval string `toml:"batch_interval"`
+	Concurrency   int    `toml:"concurrency"`
+	SSL           bool   `toml:"ssl"`
 }
 
 // Abstract out more
 func (c *BasicClient) Batch(ps <-chan Point, r chan<- response) {
 	var buf bytes.Buffer
 	var wg sync.WaitGroup
-
 	counter := NewConcurrencyLimiter(c.Concurrency)
+
+	interval, err := time.ParseDuration(c.BatchInterval)
+	if err != nil {
+		// actually do error
+	}
 
 	ctr := 0
 
@@ -309,6 +314,7 @@ func (c *BasicClient) Batch(ps <-chan Point, r chan<- response) {
 			go func(byt []byte) {
 
 				rs := c.send(byt)
+				time.Sleep(interval)
 
 				counter.Decrement()
 				r <- rs
@@ -401,9 +407,11 @@ func (q *BasicQuery) SetTime(t time.Time) {
 }
 
 type BasicQueryClient struct {
-	Address  string `toml:"address"`
-	Database string `toml:"database"`
-	client   client.Client
+	Address       string `toml:"address"`
+	Database      string `toml:"database"`
+	QueryInterval string `toml:"query_interval"`
+	Concurrency   int    `toml:"concurrency"`
+	client        client.Client
 }
 
 func (b *BasicQueryClient) Init() {
@@ -435,6 +443,31 @@ func (b *BasicQueryClient) Query(cmd Query, ts time.Time) response {
 
 	return r
 
+}
+
+func (b *BasicQueryClient) Exec(qs <-chan Query, r chan<- response, now func() time.Time) {
+	var wg sync.WaitGroup
+	counter := NewConcurrencyLimiter(b.Concurrency)
+
+	b.Init()
+
+	interval, err := time.ParseDuration(b.QueryInterval)
+	if err != nil {
+		// actually do error
+	}
+
+	for q := range qs {
+		wg.Add(1)
+		counter.Increment()
+		func(q Query, t time.Time) {
+			r <- b.Query(q, t)
+			time.Sleep(interval)
+			wg.Done()
+			counter.Decrement()
+		}(q, now())
+	}
+
+	wg.Wait()
 }
 
 ///////////////////

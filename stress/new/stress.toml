@@ -29,7 +29,7 @@
   [write.influx_client]
     [write.influx_client.basic]
       enabled = true
-      #address = "localhost:1234"
+     #address = "localhost:1234"
       address = "localhost:8086"
       database = "stress"
       precision = "n"
@@ -37,6 +37,7 @@
       concurrency = 10
       ssl = false
       format = "line_http" # line_udp, graphite_tcp, graphite_udp
+      batch_interval = "0s"
 
 [read]
   [read.query_generator]
@@ -48,4 +49,6 @@
     [read.query_client.basic]
       address = "localhost:8086"
       database = "stress"
+      query_interval = "100ms"
+      concurrency = 1
 

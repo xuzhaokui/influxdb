@@ -230,6 +230,7 @@ type QueryGenerator interface {
 // to an InfluxDB instance.
 type QueryClient interface {
 	Query(q Query, t time.Time) response
+	Exec(qs <-chan Query, r chan<- response, f func() time.Time)
 	//ResponseHandler
 }
 
@@ -308,11 +309,7 @@ func (s *StressTest) Start(wHandle responseHandler, rHandle responseHandler) {
 
 		go func() {
 			rt.StartTimer()
-			for q := range s.QueryGenerate() {
-				// Not real needs more implementation
-				time.Sleep(100 * time.Millisecond)
-				r <- s.Query(q, s.Time())
-			}
+			s.Exec(s.QueryGenerate(), r, s.Time)
 			rt.StopTimer()
 			close(r)
 		}()
