@@ -1,4 +1,4 @@
-package main
+package stress
 
 import (
 	"bytes"
@@ -11,10 +11,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"flag"
-	"os"
-	"runtime/pprof"
 
 	"github.com/BurntSushi/toml"
 	"github.com/influxdb/influxdb/client/v2"
@@ -531,7 +527,7 @@ func BasicWriteHandler(rs <-chan response, wt *Timer) {
 	fmt.Printf("	Success: %v\n", success)
 	fmt.Printf("	Fail: %v\n", fail)
 	fmt.Printf("Average Response Time: %v\n", s/time.Duration(n))
-	fmt.Printf("Points Per Second: %v\n", float64(n)*float64(10000)/float64(wt.Elapsed().Seconds()))
+	fmt.Printf("Points Per Second: %v\n\n", float64(n)*float64(10000)/float64(wt.Elapsed().Seconds()))
 }
 
 ///////////////
@@ -545,15 +541,7 @@ func BasicReadHandler(r <-chan response, rt *Timer) {
 	}
 
 	fmt.Printf("Total Queries: %v\n", n)
-	fmt.Printf("Average Query Response Time: %v\n", s/time.Duration(n))
-}
-
-var (
-	cpuprofile = flag.String("cpuprofile", "", "File where cpu profile will be written")
-)
-
-func init() {
-	flag.Parse()
+	fmt.Printf("Average Query Response Time: %v\n\n", s/time.Duration(n))
 }
 
 // DecodeFile takes a file path for a toml config file
@@ -567,35 +555,4 @@ func DecodeFile(s string) (*Config, error) {
 	}
 
 	return t, nil
-}
-
-func main() {
-
-	cfg, err := DecodeFile("stress.toml")
-
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-	}
-
-	w := NewWriter(&cfg.Write.PointGenerators.Basic, &cfg.Write.InfluxClients.Basic)
-
-	qc := &cfg.Read.QueryClients.Basic
-
-	r := NewReader(&cfg.Read.QueryGenerators.Basic, qc)
-
-	s := NewStressTest(&cfg.Provision.Basic, w, r)
-
-	s.Start(BasicWriteHandler, BasicReadHandler)
-
 }
