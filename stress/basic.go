@@ -556,3 +556,16 @@ func DecodeFile(s string) (*Config, error) {
 
 	return t, nil
 }
+
+// DecodeConfig takes a file path for a toml config file
+// and returns a pointer to a Config Struct.
+func DecodeConfig(s string) (*Config, error) {
+	t := &Config{}
+
+	// Decode the toml file
+	if _, err := toml.Decode(s, t); err != nil {
+		return nil, err
+	}
+
+	return t, nil
+}

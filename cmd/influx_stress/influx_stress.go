@@ -21,12 +21,10 @@ var (
 )
 
 func main() {
-	flag.Parse()
+	var c *stress.Config
+	var err error
 
-	if *config == "" {
-		fmt.Println("Config file required")
-		return
-	}
+	flag.Parse()
 
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -38,11 +36,18 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	c, err := stress.DecodeFile(*config)
-
-	if err != nil {
-		fmt.Println(err)
-		return
+	if *config == "" {
+		c, err = stress.BasicStress()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	} else {
+		c, err = stress.DecodeFile(*config)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 	}
 
 	w := stress.NewWriter(&c.Write.PointGenerators.Basic, &c.Write.InfluxClients.Basic)
