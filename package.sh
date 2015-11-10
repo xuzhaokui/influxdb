@@ -284,8 +284,6 @@ generate_postinstall_script() {
     version=$1
     cat  <<EOF >$POST_INSTALL_PATH
 #!/bin/sh
-set -e
-set -x
 
 if ! id influxdb >/dev/null 2>&1; then
         useradd --system -U -M influxdb -s /bin/false -d $INFLUXDB_DATA_DIR
