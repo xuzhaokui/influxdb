@@ -34,10 +34,10 @@
       database = "stress"
       precision = "n"
       batch_size = 10000
+      batch_interval = "0s"
       concurrency = 10
       ssl = false
       format = "line_http" # line_udp, graphite_tcp, graphite_udp
-      batch_interval = "0s"
 
 [read]
   [read.query_generator]
