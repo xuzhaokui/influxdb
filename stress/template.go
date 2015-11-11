@@ -56,6 +56,8 @@ var s = `
       concurrency = 1
 `
 
+// BasicStress returns a config for a basic
+// stress test.
 func BasicStress() (*Config, error) {
 	return DecodeConfig(s)
 }
