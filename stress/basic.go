@@ -12,17 +12,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/influxdb/influxdb/client/v2"
 )
 
-// tag is a struct that contains data
+// AbstractTag is a struct that contains data
 // about a tag for in a series
 type AbstractTag struct {
 	Key   string `toml:"key"`
 	Value string `toml:"value"`
 }
 
+// AbstractTags is an slice of abstract tags
 type AbstractTags []AbstractTag
 
 func (a AbstractTags) Tag(i int) Tags {
@@ -38,7 +38,8 @@ func (a AbstractTags) Tag(i int) Tags {
 	return tags
 }
 
-func (t AbstractTags) Tagify() string {
+// Template returns a templated string of tags
+func (t AbstractTags) Template() string {
 	var buf bytes.Buffer
 	for i, tag := range t {
 		if i == 0 {
@@ -61,6 +62,7 @@ type AbstractField struct {
 	Type string `toml:"type"`
 }
 
+// AbstractFields is an slice of abstract fields
 type AbstractFields []AbstractField
 
 func (a AbstractFields) Field() Fields {
@@ -86,7 +88,8 @@ func (a AbstractFields) Field() Fields {
 	return fields
 }
 
-func (f AbstractFields) Fieldify() (string, []string) {
+// Template returns a templated string of fields
+func (f AbstractFields) Template() (string, []string) {
 	var buf bytes.Buffer
 	a := make([]string, len(f))
 	for i, field := range f {
@@ -99,8 +102,6 @@ func (f AbstractFields) Fieldify() (string, []string) {
 
 	return string(b), a
 }
-
-///////////////////////////////////////////
 
 // BasicPointGenerator implements the PointGenerator interface
 type BasicPointGenerator struct {
@@ -117,6 +118,10 @@ type BasicPointGenerator struct {
 	mu          sync.Mutex
 }
 
+// typeArr accepts a string array of types and
+// returns an array of equal length where each
+// element of the array is an instance of the type
+// expressed in the string array.
 func typeArr(a []string) []interface{} {
 	i := make([]interface{}, len(a))
 	for j, ty := range a {
@@ -138,9 +143,10 @@ func typeArr(a []string) []interface{} {
 	return i
 }
 
+// Template returns a function that returns a pointer to a Pnt.
 func (b *BasicPointGenerator) Template() func(i int, t time.Time) *Pnt {
-	ts := b.Tags.Tagify()
-	fs, fa := b.Fields.Fieldify()
+	ts := b.Tags.Template()
+	fs, fa := b.Fields.Template()
 	tmplt := fmt.Sprintf("%v,%v %v %%v", b.Measurement, ts, fs)
 
 	return func(i int, t time.Time) *Pnt {
@@ -155,27 +161,54 @@ func (b *BasicPointGenerator) Template() func(i int, t time.Time) *Pnt {
 	}
 }
 
+// Pnt is a struct that implements the Point interface.
 type Pnt struct {
 	line []byte
 }
 
+// Set sets the internal state for a Pnt.
 func (p *Pnt) Set(b []byte) {
 	p.line = b
 }
 
+// Next generates very simple points very
+// efficiently.
+// TODO: Take this out
 func (p *Pnt) Next(i int, t time.Time) {
 	p.line = []byte(fmt.Sprintf("a,b=c-%v v=%v", i, i))
-	//p.line = []byte(fmt.Sprintf("a,b=c-%v v=%v %v", i, rand.Intn(1000), t.UnixNano()))
-	//p.line = []byte(fmt.Sprintf("cpu,host=server-%v,location=us-west-%v value=%v %v", i, i, rand.Intn(1000), t.UnixNano()))
 }
 
+// Line returns a byte array for a point
+// in line protocol format.
 func (p Pnt) Line() []byte {
 	return p.line
 }
 
+// Graphite returns a byte array for a point
+// in graphite format.
+func (p Pnt) Graphite() []byte {
+	// TODO: Implement
+	return []byte("")
+}
+
+// OpenJSON returns a byte array for a point
+// in opentsdb json format
+func (p Pnt) OpenJSON() []byte {
+	// TODO: Implement
+	return []byte("")
+}
+
+// OpenJSON returns a byte array for a point
+// in opentsdb-telnet format
+func (p Pnt) OpenTelnet() []byte {
+	// TODO: Implement
+	return []byte("")
+}
+
+// Generate returns a point channel. Implements the
+// Generate method for the PointGenerator interface
 func (b *BasicPointGenerator) Generate() <-chan Point {
-	//c := make(chan Point, 0)
-	// should be 1.5x batch size
+	// TODO: should be 1.5x batch size
 	c := make(chan Point, 15000)
 	tmplt := b.Template()
 
@@ -203,9 +236,6 @@ func (b *BasicPointGenerator) Generate() <-chan Point {
 
 			for j := 0; j < b.SeriesCount; j++ {
 				p := tmplt(j, b.time)
-				// very fast
-				//p := &Pnt{}
-				//p.Next(j, b.time)
 
 				c <- *p
 			}
@@ -215,53 +245,9 @@ func (b *BasicPointGenerator) Generate() <-chan Point {
 	return c
 }
 
-// Generate returns a receiving Point
-// channel.
-// USE AS EXAMPLE
-func (b *BasicPointGenerator) Generate2() <-chan Point {
-	c := make(chan Point, 0)
-
-	go func(c chan Point) {
-		defer close(c)
-
-		start, err := time.Parse("2006-Jan-02", b.StartDate)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		b.mu.Lock()
-		b.time = start
-		b.mu.Unlock()
-
-		tick, err := time.ParseDuration(b.Tick)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		for i := 0; i < b.PointCount; i++ {
-			b.mu.Lock()
-			b.time = b.time.Add(tick)
-			b.mu.Unlock()
-
-			for j := 0; j < b.SeriesCount; j++ {
-				p := StdPoint{
-					Measurement: b.Measurement,
-					//Tags:        append(make(Tags, 0), Tag{Key: "host", Value: fmt.Sprintf("server-%v", j)}),
-					//Tags:      append(make(Tags, 0), Tag{Key: "host", Value: fmt.Sprintf("server-%v", j)}, Tag{Key: "location", Value: fmt.Sprintf("us-%v", j)}),
-					Tags:   b.Tags.Tag(j),    // Bottleneck is here
-					Fields: b.Fields.Field(), // Bottleneck is here
-					//Fields:    append(make(Fields, 0), Field{Key: "value", Value: fmt.Sprintf("%v", rand.Intn(100))}),
-					Timestamp: b.time.UnixNano(),
-				}
-
-				c <- p
-			}
-		}
-	}(c)
-
-	return c
-}
-
+// Time returns the timestamp for the latest points
+// that are being generated. Implements the Time method
+// for the PointGenerator interface.
 func (b *BasicPointGenerator) Time() time.Time {
 	b.mu.Lock()
 	t := b.time
@@ -269,6 +255,8 @@ func (b *BasicPointGenerator) Time() time.Time {
 	return t
 }
 
+// BasicClient implements the InfluxClient
+// interface.
 type BasicClient struct {
 	Enabled       bool   `toml:"enabled"`
 	Address       string `toml:"address"`
@@ -280,7 +268,7 @@ type BasicClient struct {
 	SSL           bool   `toml:"ssl"`
 }
 
-// Abstract out more
+// Batch groups together points
 func (c *BasicClient) Batch(ps <-chan Point, r chan<- response) {
 	var buf bytes.Buffer
 	var wg sync.WaitGroup
@@ -326,6 +314,7 @@ func (c *BasicClient) Batch(ps <-chan Point, r chan<- response) {
 	wg.Wait()
 }
 
+// post sends a post request with a payload of points
 func post(url string, datatype string, data io.Reader) (*http.Response, error) {
 
 	resp, err := http.Post(url, datatype, data)
@@ -346,6 +335,7 @@ func post(url string, datatype string, data io.Reader) (*http.Response, error) {
 	return resp, nil
 }
 
+// Send calls post and returns a response
 func (c *BasicClient) send(b []byte) response {
 	instanceURL := fmt.Sprintf("http://%v/write?db=%v&precision=%v", c.Address, c.Database, c.Precision)
 	t := NewTimer()
@@ -366,20 +356,14 @@ func (c *BasicClient) send(b []byte) response {
 	return r
 }
 
-func (c *BasicClient) Handle(resp <-chan response, fn func(r response)) {
-	for rs := range resp {
-		fn(rs)
-	}
-}
-
-//////////////
-
+// BasicQuery implements the QueryGenerator interface
 type BasicQuery struct {
 	Template   Query `toml:"template"`
 	QueryCount int   `toml:"query_count"`
 	time       time.Time
 }
 
+// QueryGenerate returns a Query channel
 func (q *BasicQuery) QueryGenerate() <-chan Query {
 	c := make(chan Query, 0)
 
@@ -396,12 +380,14 @@ func (q *BasicQuery) QueryGenerate() <-chan Query {
 	return c
 }
 
+// SetTime sets the internal state of time
 func (q *BasicQuery) SetTime(t time.Time) {
 	q.time = t
 
 	return
 }
 
+// BasicQueryClient implements the QueryClient interface
 type BasicQueryClient struct {
 	Address       string `toml:"address"`
 	Database      string `toml:"database"`
@@ -410,6 +396,7 @@ type BasicQueryClient struct {
 	client        client.Client
 }
 
+// Init initializes the InfluxDB client
 func (b *BasicQueryClient) Init() {
 	u, _ := url.Parse(fmt.Sprintf("http://%v", b.Address))
 	cl := client.NewClient(client.Config{
@@ -419,6 +406,7 @@ func (b *BasicQueryClient) Init() {
 	b.client = cl
 }
 
+// Query runs the query
 func (b *BasicQueryClient) Query(cmd Query, ts time.Time) response {
 	q := client.Query{
 		Command:  string(cmd),
@@ -441,6 +429,7 @@ func (b *BasicQueryClient) Query(cmd Query, ts time.Time) response {
 
 }
 
+// Exec listens to the query channel an executes queries as they come in
 func (b *BasicQueryClient) Exec(qs <-chan Query, r chan<- response, now func() time.Time) {
 	var wg sync.WaitGroup
 	counter := NewConcurrencyLimiter(b.Concurrency)
@@ -468,6 +457,8 @@ func (b *BasicQueryClient) Exec(qs <-chan Query, r chan<- response, now func() t
 
 ///////////////////
 
+// resetDB will drop an create a new database on an existing
+// InfluxDB instance.
 func resetDB(c client.Client, database string) error {
 	_, err := c.Query(client.Query{
 		Command: fmt.Sprintf("DROP DATABASE %s", database),
@@ -484,6 +475,8 @@ func resetDB(c client.Client, database string) error {
 	return nil
 }
 
+// BasicProvisioner implements the Provisioner
+// interface.
 type BasicProvisioner struct {
 	Enabled       bool   `toml:"enabled"`
 	Address       string `toml:"address"`
@@ -491,6 +484,7 @@ type BasicProvisioner struct {
 	ResetDatabase bool   `toml:"reset_database"`
 }
 
+// Provision runs the resetDB function.
 func (b *BasicProvisioner) Provision() {
 	u, _ := url.Parse(fmt.Sprintf("http://%v", b.Address))
 	cl := client.NewClient(client.Config{
@@ -502,6 +496,7 @@ func (b *BasicProvisioner) Provision() {
 	}
 }
 
+// BasicWriteHandler handles write responses.
 func BasicWriteHandler(rs <-chan response, wt *Timer) {
 	n := 0
 	success := 0
@@ -530,8 +525,7 @@ func BasicWriteHandler(rs <-chan response, wt *Timer) {
 	fmt.Printf("Points Per Second: %v\n\n", float64(n)*float64(10000)/float64(wt.Elapsed().Seconds()))
 }
 
-///////////////
-
+// BasicReadHandler handles read responses.
 func BasicReadHandler(r <-chan response, rt *Timer) {
 	n := 0
 	s := time.Duration(0)
@@ -542,30 +536,4 @@ func BasicReadHandler(r <-chan response, rt *Timer) {
 
 	fmt.Printf("Total Queries: %v\n", n)
 	fmt.Printf("Average Query Response Time: %v\n\n", s/time.Duration(n))
-}
-
-// DecodeFile takes a file path for a toml config file
-// and returns a pointer to a Config Struct.
-func DecodeFile(s string) (*Config, error) {
-	t := &Config{}
-
-	// Decode the toml file
-	if _, err := toml.DecodeFile(s, t); err != nil {
-		return nil, err
-	}
-
-	return t, nil
-}
-
-// DecodeConfig takes a file path for a toml config file
-// and returns a pointer to a Config Struct.
-func DecodeConfig(s string) (*Config, error) {
-	t := &Config{}
-
-	// Decode the toml file
-	if _, err := toml.Decode(s, t); err != nil {
-		return nil, err
-	}
-
-	return t, nil
 }

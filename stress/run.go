@@ -8,57 +8,39 @@ import (
 	"time"
 )
 
-////////////////////////////////////
+// Point is an interface that is used to represent
+// the abstract idea of a point in InfluxDB.
+type Point interface {
+	Line() []byte
+	Graphite() []byte
+	OpenJSON() []byte
+	OpenTelnet() []byte
+}
 
-//type Tag struct {
-//	Key   []byte
-//	Value []byte
-//}
-//
-//type Field struct {
-//	Key   []byte
-//	Value []byte
-//}
-//type Point struct {
-//	Measurement []byte
-//	Tags        []Tag
-//	Fields      []Field
-//	Timestamp   []byte
-//}
+///////////////////////////////////////////
+// Implementation of the Point Interface //
+///////////////////////////////////////////
 
+// KeyValue is an intermediate type that is used
+// to express Tag and Field similarly.
 type KeyValue struct {
 	Key   string
 	Value string
 }
 
-// Tag is a struct for a tag in influxdb
+// Tag is a struct for a tag in influxdb.
 type Tag KeyValue
 
-// Field is a struct for a field in influxdb
+// Field is a struct for a field in influxdb.
 type Field KeyValue
 
-// Tags is an slice of all the tags for a point
+// Tags is an slice of all the tags for a point.
 type Tags []Tag
 
-// Fields is an slice of all the fields for a point
+// Fields is an slice of all the fields for a point.
 type Fields []Field
 
-type Point interface {
-	Line() []byte
-	//Graphite() []byte
-	//OpenJSON() []byte
-	//OpenTelnet() []byte
-}
-
-// Point represents a point in InfluxDB
-type StdPoint struct {
-	Measurement string
-	Tags        Tags
-	Fields      Fields
-	Timestamp   int64
-}
-
-// tagset returns a byte array for a points tagset
+// tagset returns a byte array for a points tagset.
 func (t Tags) tagset() []byte {
 	var buf bytes.Buffer
 	for _, tag := range t {
@@ -71,7 +53,7 @@ func (t Tags) tagset() []byte {
 	return b
 }
 
-// fieldset returns a byte array for a points fieldset
+// fieldset returns a byte array for a points fieldset.
 func (f Fields) fieldset() []byte {
 	var buf bytes.Buffer
 	for _, field := range f {
@@ -82,6 +64,14 @@ func (f Fields) fieldset() []byte {
 	b = b[0 : len(b)-1]
 
 	return b
+}
+
+// Point represents a point in InfluxDB
+type StdPoint struct {
+	Measurement string
+	Tags        Tags
+	Fields      Fields
+	Timestamp   int64
 }
 
 // Line returns a byte array for a point in
@@ -148,17 +138,10 @@ func (p StdPoint) OpenTelnet() []byte {
 	return []byte("hello")
 }
 
-/////////////////////////////
-
-// Should be related to ResponseTime in util.go
-//type response struct {
-//	Status   string
-//	Time     time.Time
-//	Duration time.Duration
-//}
+////////////////////////////////////////
 
 // response is the results making
-// a request to influxdb
+// a request to influxdb.
 type response struct {
 	Resp  *http.Response
 	Time  time.Time
@@ -166,7 +149,7 @@ type response struct {
 }
 
 // Success returns true if the request
-// was successful and false otherwise
+// was successful and false otherwise.
 func (r response) Success() bool {
 	// ADD success for tcp, udp, etc
 	if r.Resp == nil || r.Resp.StatusCode != 204 {
@@ -176,14 +159,18 @@ func (r response) Success() bool {
 	}
 }
 
+// WriteResponse is a response for a Writer
 type WriteResponse response
 
+// QueryResponse is a response for a Reader
 type QueryResponse struct {
 	response
 	Body string
 }
 
-////////////////////////////////////////
+///////////////////////////////
+// Definition of the Writer ///
+///////////////////////////////
 
 // PointGenerator is an interface for generating points.
 type PointGenerator interface {
@@ -191,20 +178,20 @@ type PointGenerator interface {
 	Time() time.Time
 }
 
-// InfluxClient is an interface for writing data to the database
+// InfluxClient is an interface for writing data to the database.
 type InfluxClient interface {
 	Batch(ps <-chan Point, r chan<- response)
 	send(b []byte) response
 	//ResponseHandler
 }
 
-// Writer is a PointGenerator and an InfluxClient
+// Writer is a PointGenerator and an InfluxClient.
 type Writer struct {
 	PointGenerator
 	InfluxClient
 }
 
-// NewWriter returns a Writer
+// NewWriter returns a Writer.
 func NewWriter(p PointGenerator, i InfluxClient) Writer {
 	w := Writer{
 		PointGenerator: p,
@@ -214,13 +201,15 @@ func NewWriter(p PointGenerator, i InfluxClient) Writer {
 	return w
 }
 
-///////////////////////////////////////////
+///////////////////////////////
+// Definition of the Reader ///
+///////////////////////////////
 
 // Query is query
 type Query string
 
 // QueryGenerator is an interface that is used
-// to define queries that will be ran on the DB
+// to define queries that will be ran on the DB.
 type QueryGenerator interface {
 	QueryGenerate() <-chan Query
 	SetTime(t time.Time)
@@ -231,16 +220,15 @@ type QueryGenerator interface {
 type QueryClient interface {
 	Query(q Query, t time.Time) response
 	Exec(qs <-chan Query, r chan<- response, f func() time.Time)
-	//ResponseHandler
 }
 
-// Reader queries the database
+// Reader queries the database.
 type Reader struct {
 	QueryGenerator
 	QueryClient
 }
 
-// NewReader returns a Reader
+// NewReader returns a Reader.
 func NewReader(q QueryGenerator, c QueryClient) Reader {
 	r := Reader{
 		QueryGenerator: q,
@@ -250,13 +238,9 @@ func NewReader(q QueryGenerator, c QueryClient) Reader {
 	return r
 }
 
-/////////////////////////////////////////
-
-// Think out more
-//type Config struct {
-//	Database string
-//	Address  string
-//}
+///////////////////////////////////
+// Definition of the Provisioner //
+///////////////////////////////////
 
 // Provisioner is an interface that provisions an
 // InfluxDB instance
@@ -264,7 +248,9 @@ type Provisioner interface {
 	Provision()
 }
 
-/////////////////////////////////////////////
+/////////////////////////////////
+// Definition of StressTest /////
+/////////////////////////////////
 
 // StressTest is a struct that contains all of
 // the logic required to execute a Stress Test
@@ -274,6 +260,7 @@ type StressTest struct {
 	Reader
 }
 
+// responseHandler
 type responseHandler func(r <-chan response, t *Timer)
 
 // Start executes the Stress Test
